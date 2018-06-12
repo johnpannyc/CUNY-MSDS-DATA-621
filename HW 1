@@ -1,0 +1,678 @@
+
+CUNY MSDS DATA 621 - HW 1
+NIcholas Schettini
+June 5, 2018
+Overview
+Data Exploration
+Data Preparation
+Build Models
+Select Models
+Overview
+In this homework assignment, you will explore, analyze and model a data set containing approximately 2200 records. Each record represents a professional baseball team from the years 1871 to 2006 inclusive. Each record has the performance of the team for the given year, with all of the statistics adjusted to match the performance of a 162 game season.
+
+Your objective is to build a multiple linear regression model on the training data to predict the number of wins for the team. You can only use the variables given to you (or variables that you derive from the variables provided). Below is a short description of the variables of interest in the data set:
+
+Caption for the picture.
+Caption for the picture.
+
+Data Exploration
+The dataset consists of 17 elements, with 2276 total cases. Out of those 17, 15 are explanatory variables, which can be broken down into four groups:
+
+batting
+baserun
+fielding
+pitching
+vars	n	mean	sd	median	trimmed	mad	min	max	range	skew	kurtosis	se	na_count
+TARGET_WINS	2	191	80.92670	12.115013	82	81.11765	13.3434	43	116	73	-0.1698314	-0.2952783	0.8766116	0
+TEAM_BATTING_H	3	191	1478.62827	76.147869	1477	1477.42484	74.1300	1308	1667	359	0.1302702	-0.3710350	5.5098664	0
+TEAM_BATTING_2B	4	191	297.19895	26.329335	296	296.62745	25.2042	201	373	172	0.0915189	0.4778716	1.9051238	0
+TEAM_BATTING_3B	5	191	30.74346	9.043878	29	30.13072	8.8956	12	61	49	0.7007420	0.7446217	0.6543921	0
+TEAM_BATTING_HR	6	191	178.05236	32.413243	175	176.81046	35.5824	116	260	144	0.2980673	-0.7172373	2.3453399	0
+TEAM_BATTING_BB	7	191	543.31937	74.842133	535	541.31373	74.1300	365	775	410	0.3115199	-0.1474175	5.4153867	0
+TEAM_BATTING_SO	8	191	1051.02618	104.156382	1050	1046.95425	97.8516	805	1399	594	0.3985050	0.3955105	7.5364913	102
+TEAM_BASERUN_SB	9	191	90.90576	29.916401	87	89.06536	29.6520	31	177	146	0.5553966	-0.1414909	2.1646748	131
+TEAM_BASERUN_CS	10	191	39.94241	11.898334	38	39.49020	11.8608	12	74	62	0.3468509	0.0006392	0.8609332	772
+TEAM_BATTING_HBP	11	191	59.35602	12.967123	58	58.86275	11.8608	29	95	66	0.3185754	-0.1119828	0.9382681	2085
+TEAM_PITCHING_H	12	191	1479.70157	75.788625	1480	1478.50327	72.6474	1312	1667	355	0.1279056	-0.3894781	5.4838725	0
+TEAM_PITCHING_HR	13	191	178.17801	32.391678	175	176.93464	35.5824	116	260	144	0.2989191	-0.7190905	2.3437795	0
+TEAM_PITCHING_BB	14	191	543.71728	74.916681	537	541.74510	72.6474	367	775	408	0.3144366	-0.1338563	5.4207808	0
+TEAM_PITCHING_SO	15	191	1051.81675	104.347208	1052	1047.80392	97.8516	805	1399	594	0.3945586	0.3903991	7.5502990	102
+TEAM_FIELDING_E	16	191	107.05236	16.632162	106	106.58170	17.7912	65	145	80	0.1780432	-0.3567367	1.2034610	0
+TEAM_FIELDING_DP	17	191	152.33508	17.611682	152	152.04575	19.2738	113	204	91	0.2164822	-0.2115741	1.2743366	286
+Looking at the data above, there are multiple variables with missing (NA) values, with TEAM-BATTING_HBP being the highest.
+
+The boxplots below help show the spread of data within the dataset, and show various outliers. As shown in the graph below, TEAM_PITCHING_H seems to have the highest spread with the most outliers.
+
+## Warning: Removed 3478 rows containing non-finite values (stat_boxplot).
+
+The graph below zooms into the other variables, so it becomes easier to see spread and outliers from the other variables.
+
+
+In the Histograms below, the data shows multiple graphs with right skews while only a few have left-skew.
+
+
+The correlation plot below shows how variables in the dataset are related to each other. Looking at the plot, we can see that certain variables are more related than others.
+
+For this project, it makes sense to break down the correlation by wins - since that’s what we’re trying to predict.
+
+x
+TARGET_WINS	1.0000000
+TEAM_BATTING_H	0.4699467
+TEAM_BATTING_2B	0.3129840
+TEAM_BATTING_3B	-0.1243459
+TEAM_BATTING_HR	0.4224168
+TEAM_BATTING_BB	0.4686879
+TEAM_BATTING_SO	-0.2288927
+TEAM_BASERUN_SB	0.0148364
+TEAM_BASERUN_CS	-0.1787560
+TEAM_BATTING_HBP	0.0735042
+TEAM_PITCHING_H	0.4712343
+TEAM_PITCHING_HR	0.4224668
+TEAM_PITCHING_BB	0.4683988
+TEAM_PITCHING_SO	-0.2293648
+TEAM_FIELDING_E	-0.3866880
+TEAM_FIELDING_DP	-0.1958660
+Below is a visual representation of the correlation plot.
+
+
+Data Preparation
+Removal of Data
+The variable TEAM_BATTING_HBP is also missing over 90% of its values. That variable will be removed completely.
+
+The variable TEAM_PITCHING_HR and TEAM_BATTING_HR are also very closely correlated with each other. This shows that there may be some collinearity involved. The TEAM_PITCHING_HR variable will be dropped from the dataset
+
+Using the VIF and vifstep function from the USDM package, the data will first be tested for other collinearity issues. The variables determined that have collinearity issues will be discarded.
+
+Imputation of Missing (NA) values
+The data exploration revealed multiple variables that had numerious NA values. There are multiple ways to handle NA data: deleting the observations, deleting the variables, imputation with the mean/median/mode, or imputation with a prediction.
+
+Imputation the mean/median/mode is an easy way to fill in the missing NA’s, however it reduces the variance in the dataset and shrinks standard errors - which can invalidate hypothesis tests.
+
+In this case, data will be imputated via prediction using the MICE (Multivariate Imputation) library using a random forest prediction method.
+
+Variables that exceed the established threshold will be discarded to avoid collinearity issues.
+
+vif(imputed)
+##           Variables      VIF
+## 1       TARGET_WINS 1.493107
+## 2    TEAM_BATTING_H 4.002545
+## 3   TEAM_BATTING_2B 2.474407
+## 4   TEAM_BATTING_3B 3.017723
+## 5   TEAM_BATTING_HR 4.860554
+## 6   TEAM_BATTING_BB 5.591129
+## 7   TEAM_BATTING_SO 5.213927
+## 8   TEAM_BASERUN_SB 2.472074
+## 9   TEAM_BASERUN_CS 2.219426
+## 10  TEAM_PITCHING_H 3.650494
+## 11 TEAM_PITCHING_BB 4.758864
+## 12 TEAM_PITCHING_SO 2.978935
+## 13  TEAM_FIELDING_E 4.476378
+## 14 TEAM_FIELDING_DP 1.698153
+v1 <- vifstep(imputed, th=10)
+Output - The below table shows the results of above data manipulation.
+The NA data has been ‘filled in’ using the MICE prediction, using the Random Forest Method. Variables with collinearity as established by the vir/virstep package have been dropped.
+
+vars	n	mean	sd	median	trimmed	mad	min	max	range	skew	kurtosis	se
+TARGET_WINS	1	2276	80.79086	15.75215	82.0	81.31229	14.8260	0	146	146	-0.3987232	1.0274757	0.3301823
+TEAM_BATTING_H	2	2276	1469.26977	144.59120	1454.0	1459.04116	114.1602	891	2554	1663	1.5713335	7.2785261	3.0307891
+TEAM_BATTING_2B	3	2276	241.24692	46.80141	238.0	240.39627	47.4432	69	458	389	0.2151018	0.0061609	0.9810087
+TEAM_BATTING_3B	4	2276	55.25000	27.93856	47.0	52.17563	23.7216	0	223	223	1.1094652	1.5032418	0.5856226
+TEAM_BATTING_HR	5	2276	99.61204	60.54687	102.0	97.38529	78.5778	0	264	264	0.1860421	-0.9631189	1.2691285
+TEAM_BATTING_BB	6	2276	501.55888	122.67086	512.0	512.18331	94.8864	0	878	878	-1.0257599	2.1828544	2.5713150
+TEAM_BATTING_SO	7	2276	731.06986	245.22029	738.0	736.39517	278.7288	0	1399	1399	-0.2541695	-0.3018555	5.1400846
+TEAM_BASERUN_SB	8	2276	128.68805	91.84514	103.0	114.02799	65.2344	0	697	697	1.8088545	4.3256861	1.9251743
+TEAM_BASERUN_CS	9	2276	68.79438	42.98475	54.0	61.21954	23.7216	0	201	201	1.5373141	1.6607973	0.9010072
+TEAM_PITCHING_H	10	2276	1779.21046	1406.84293	1518.0	1555.89517	174.9468	1137	30132	28995	10.3295111	141.8396985	29.4889618
+TEAM_PITCHING_BB	11	2276	553.00791	166.35736	536.5	542.62459	98.5929	0	3645	3645	6.7438995	96.9676398	3.4870317
+TEAM_PITCHING_SO	12	2276	811.49912	541.97618	803.0	790.56806	255.0072	0	19278	19278	22.5421104	696.4560183	11.3604118
+TEAM_FIELDING_E	13	2276	246.48067	227.77097	159.0	193.43798	62.2692	65	1898	1833	2.9904656	10.9702717	4.7743279
+TEAM_FIELDING_DP	14	2276	143.10457	27.59939	146.0	144.17618	25.2042	52	228	176	-0.3347496	-0.0918945	0.5785133
+Build Models
+Model 1: All Variables
+All remaining variables after the data prep.
+
+## 
+## Call:
+## lm(formula = TARGET_WINS ~ ., data = imputed)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -54.230  -8.302   0.095   8.278  59.440 
+## 
+## Coefficients:
+##                    Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      30.9762520  5.3140084   5.829 6.37e-09 ***
+## TEAM_BATTING_H    0.0452344  0.0036278  12.469  < 2e-16 ***
+## TEAM_BATTING_2B  -0.0178919  0.0091024  -1.966  0.04946 *  
+## TEAM_BATTING_3B   0.0491886  0.0168215   2.924  0.00349 ** 
+## TEAM_BATTING_HR   0.0708826  0.0097564   7.265 5.10e-13 ***
+## TEAM_BATTING_BB   0.0082077  0.0052218   1.572  0.11613    
+## TEAM_BATTING_SO  -0.0110757  0.0025131  -4.407 1.10e-05 ***
+## TEAM_BASERUN_SB   0.0360865  0.0045776   7.883 4.92e-15 ***
+## TEAM_BASERUN_CS  -0.0119112  0.0093907  -1.268  0.20478    
+## TEAM_PITCHING_H  -0.0004554  0.0003680  -1.238  0.21598    
+## TEAM_PITCHING_BB  0.0018495  0.0035541   0.520  0.60286    
+## TEAM_PITCHING_SO  0.0020281  0.0008621   2.352  0.01873 *  
+## TEAM_FIELDING_E  -0.0268657  0.0024536 -10.950  < 2e-16 ***
+## TEAM_FIELDING_DP -0.1201176  0.0125462  -9.574  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 12.93 on 2262 degrees of freedom
+## Multiple R-squared:  0.3303, Adjusted R-squared:  0.3264 
+## F-statistic:  85.8 on 13 and 2262 DF,  p-value: < 2.2e-16
+Conclusions based on model: F-statistic is 89.25, R-squared is 0.3352
+
+Model 2: Highly Significant Variables Only
+## 
+## Call:
+## lm(formula = TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_3B + 
+##     TEAM_BATTING_HR + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_SO + 
+##     TEAM_FIELDING_E + TEAM_FIELDING_DP, data = imputed)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -54.915  -8.364   0.181   8.345  57.304 
+## 
+## Coefficients:
+##                    Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      38.0411204  4.6089911   8.254 2.57e-16 ***
+## TEAM_BATTING_H    0.0395453  0.0026819  14.745  < 2e-16 ***
+## TEAM_BATTING_3B   0.0568238  0.0163978   3.465 0.000539 ***
+## TEAM_BATTING_HR   0.0809118  0.0091976   8.797  < 2e-16 ***
+## TEAM_BATTING_SO  -0.0128803  0.0023373  -5.511 3.98e-08 ***
+## TEAM_BASERUN_SB   0.0387369  0.0038860   9.968  < 2e-16 ***
+## TEAM_PITCHING_SO  0.0017582  0.0005825   3.018 0.002571 ** 
+## TEAM_FIELDING_E  -0.0306473  0.0017250 -17.766  < 2e-16 ***
+## TEAM_FIELDING_DP -0.1117620  0.0121767  -9.178  < 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 12.96 on 2267 degrees of freedom
+## Multiple R-squared:  0.3254, Adjusted R-squared:  0.3231 
+## F-statistic: 136.7 on 8 and 2267 DF,  p-value: < 2.2e-16
+Conclusions based on model: F-statistic is 143, R-squared is 0.333
+
+Model 3: Backwards Elimination and Significance
+Variables will be removed one by one to determine best fit model.
+
+## 
+## Call:
+## lm(formula = TARGET_WINS ~ TEAM_BATTING_H + TEAM_BASERUN_SB + 
+##     TEAM_FIELDING_E + TEAM_BATTING_HR, data = imputed)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -50.759  -8.989   0.001   8.557  60.707 
+## 
+## Coefficients:
+##                  Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)      6.080667   2.919303   2.083 0.037370 *  
+## TEAM_BATTING_H   0.049432   0.002041  24.219  < 2e-16 ***
+## TEAM_BASERUN_SB  0.045179   0.003474  13.006  < 2e-16 ***
+## TEAM_FIELDING_E -0.024460   0.001626 -15.047  < 2e-16 ***
+## TEAM_BATTING_HR  0.023045   0.006038   3.817 0.000139 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 13.3 on 2271 degrees of freedom
+## Multiple R-squared:  0.2882, Adjusted R-squared:  0.2869 
+## F-statistic: 229.8 on 4 and 2271 DF,  p-value: < 2.2e-16
+Conclusions based on model: F-statistic is 245.5, R-squared is 0.3006
+
+Select Models
+The three models from the previous selection have been summarised below. From the three models, I decided to use model 3 for the predictions.
+
+Model 1	Model 2	Model 3
+Mean Squared Error: 166.110817022804	Mean Squared Error: 167.305276436935	Mean Squared Error: 176.549797341994
+Root MSE: 12.8883985437604	Root MSE: 12.9346540903472	Root MSE: 13.2872042711021
+Adjusted R-squared: 0.326406702003987	Adjusted R-squared: 0.3230594008821	Adjusted R-squared: 0.286912977358342
+F-statistic: 85.8006846573995	F-statistic: 136.713557800433	F-statistic: 229.838487717872
+Predictions
+Similar to the train data, the evaulation data also needs some prep work. Similar to what was done for the test data, the eval data has had columns removed, and NA values imputed using the MICE - Random Forest method to predict what the NA values could be.
+
+vars	n	mean	sd	median	trimmed	mad	min	max	range	skew	kurtosis	se
+TEAM_BATTING_H	1	259	1469.38996	150.65523	1455	1463.68421	114.1602	819	2170	1351	0.5876139	3.6642947	9.361261
+TEAM_BATTING_2B	2	259	241.32046	49.51612	239	242.32536	48.9258	44	376	332	-0.3273282	0.6693023	3.076782
+TEAM_BATTING_3B	3	259	55.91120	27.14410	52	52.94737	26.6868	14	155	141	0.9790284	0.6987468	1.686652
+TEAM_BATTING_HR	4	259	95.63320	56.33221	101	93.67943	66.7170	0	242	242	0.1712363	-0.9031262	3.500313
+TEAM_BATTING_BB	5	259	498.95753	120.59215	509	505.98086	94.8864	15	792	777	-0.9209916	2.5265655	7.493232
+TEAM_BATTING_SO	6	259	704.99228	237.16468	681	709.58852	256.4898	0	1268	1268	-0.2213115	-0.1551769	14.736696
+TEAM_BASERUN_SB	7	259	126.04247	92.95720	95	111.40191	63.7518	0	580	580	1.7006386	3.5389788	5.776079
+TEAM_BASERUN_CS	8	259	62.22394	32.06190	56	58.61244	25.2042	0	154	154	0.9865743	0.6588153	1.992229
+TEAM_PITCHING_H	9	259	1813.46332	1662.91308	1515	1554.25359	173.4642	1155	22768	21613	9.2764797	102.0702914	103.328391
+TEAM_PITCHING_BB	10	259	552.41699	172.95006	526	536.46411	97.8516	136	2008	1872	4.1113772	29.2127324	10.746594
+TEAM_PITCHING_SO	11	259	791.79923	613.56146	736	759.04785	237.2160	0	9963	9963	12.8676395	189.7989602	38.124854
+TEAM_FIELDING_E	12	259	249.74903	230.90260	163	197.36364	59.3040	73	1568	1495	3.0887263	10.8748551	14.347589
+TEAM_FIELDING_DP	13	259	143.43243	26.46158	146	144.28230	25.2042	69	204	135	-0.3075997	-0.0912832	1.644243
+After imputing and cleaning the data, using the predict function and Model 3, the following are the predicted values:
+
+fit	lwr	upr
+67.13389	41.021003	93.24677
+67.60317	41.491617	93.71472
+76.03187	49.935020	102.12872
+89.47472	63.374218	115.57522
+65.44996	39.321801	91.57812
+71.23526	45.127383	97.34315
+82.12662	55.995652	108.25759
+75.64029	49.540105	101.74047
+70.09499	43.980805	96.20918
+74.32303	48.218167	100.42790
+75.77243	49.667566	101.87730
+82.31053	56.211317	108.40975
+78.61060	52.503878	104.71732
+80.47025	54.367315	106.57318
+78.93180	52.836254	105.02734
+79.49668	53.399827	105.59352
+73.21855	47.117668	99.31943
+82.05127	55.953361	108.14919
+68.42045	42.307506	94.53340
+91.92187	65.811687	118.03206
+81.76555	55.657120	107.87399
+85.93100	59.827100	112.03490
+77.75452	51.657569	103.85147
+73.81748	47.716531	99.91843
+85.97565	59.879615	112.07169
+89.74858	63.648022	115.84915
+62.01157	35.799732	88.22342
+76.70441	50.599079	102.80974
+82.25139	56.137240	108.36553
+78.39243	52.277783	104.50708
+86.77930	60.680556	112.87804
+84.20619	58.110212	110.30217
+82.22263	56.125528	108.31974
+83.02180	56.921022	109.12259
+79.60221	53.504958	105.69946
+80.87900	54.767154	106.99084
+75.45276	49.355641	101.54988
+87.90492	61.789438	114.02041
+86.01366	59.913633	112.11368
+87.46383	61.356087	113.57158
+82.09505	55.997884	108.19222
+87.15953	61.059824	113.25924
+29.03209	2.578075	55.48610
+99.76589	73.548008	125.98377
+90.37310	64.228812	116.51738
+90.48320	64.359597	116.60680
+96.38777	70.253840	122.52171
+73.57741	47.476761	99.67805
+69.59233	43.480681	95.70397
+76.77395	50.671900	102.87601
+79.93841	53.837606	106.03921
+87.73797	61.628928	113.84702
+77.38269	51.286027	103.47935
+73.21947	47.118259	99.32068
+78.24122	52.148774	104.33366
+79.36170	53.267107	105.45629
+88.71219	62.591351	114.83303
+73.84044	47.722930	99.95794
+62.25030	36.111822	88.38879
+77.52935	51.423081	103.63561
+86.53606	60.424929	112.64718
+76.28070	50.171172	102.39023
+85.99164	59.894750	112.08853
+85.94491	59.816659	112.07315
+86.25691	60.144796	112.36902
+99.89879	73.722882	126.07469
+75.18184	49.085237	101.27844
+83.40013	57.292445	109.50781
+78.62013	52.501439	104.73883
+84.90328	58.785238	111.02132
+84.78216	58.657048	110.90728
+77.19722	51.084447	103.30999
+79.52685	53.429270	105.62443
+83.75032	57.627299	109.87334
+85.42394	59.323613	111.52426
+86.49692	60.395564	112.59828
+81.34432	55.248103	107.44054
+82.54931	56.449792	108.64883
+71.78883	45.676822	97.90083
+78.33723	52.227415	104.44705
+87.23117	61.125959	113.33637
+89.21983	63.110817	115.32884
+96.67504	70.546679	122.80339
+81.64269	55.538460	107.74692
+80.62182	54.523919	106.71972
+82.27629	56.181642	108.37094
+79.38584	53.286664	105.48502
+82.58682	56.492522	108.68111
+84.47844	58.384456	110.57242
+90.04513	63.933064	116.15719
+79.18752	53.076767	105.29827
+86.98904	60.724223	113.25386
+73.19810	47.097161	99.29904
+82.59017	56.481303	108.69904
+84.63687	58.518501	110.75525
+79.80958	53.699627	105.91953
+82.81149	56.701593	108.92139
+96.27095	70.130132	122.41176
+86.52133	60.403042	112.63963
+88.87990	62.772744	114.98705
+83.05907	56.952757	109.16538
+73.07741	46.976165	99.17865
+83.69488	57.593199	109.79656
+78.39517	52.293768	104.49657
+81.25831	55.145590	107.37103
+76.62478	50.512852	102.73670
+55.55218	29.390337	81.71403
+83.62842	57.530759	109.72608
+84.01299	57.909580	110.11640
+61.60384	35.478974	87.72870
+82.74917	56.655541	108.84281
+87.04490	60.944304	113.14550
+94.36318	68.257055	120.46930
+91.26512	65.165219	117.36501
+83.91654	57.823823	110.00926
+83.14231	57.048676	109.23595
+91.07969	64.978911	117.18047
+82.39906	56.303368	108.49475
+79.75115	53.656271	105.84604
+77.30378	51.157840	103.44972
+89.48367	63.367339	115.60000
+67.13805	41.015438	93.26066
+66.88025	40.764122	92.99638
+60.18924	34.051818	86.32666
+68.89516	42.779948	95.01038
+87.44636	61.332895	113.55982
+88.63236	62.505885	114.75883
+75.00011	48.898685	101.10154
+87.70290	61.602136	113.80366
+93.21897	67.100811	119.33713
+86.36280	60.255159	112.47043
+80.58717	54.486184	106.68816
+79.57160	53.474402	105.66881
+85.07910	58.980537	111.17767
+85.25844	59.148847	111.36804
+71.66529	45.539593	97.79099
+76.52087	50.424502	102.61724
+79.23848	53.141304	105.33565
+90.37083	64.256637	116.48502
+82.48232	56.388790	108.57586
+67.42712	41.311210	93.54303
+69.75680	43.640566	95.87304
+91.63847	65.521659	117.75529
+76.71339	50.611396	102.81538
+72.89430	46.784313	99.00429
+72.34678	46.243360	98.45020
+78.49441	52.397429	104.59139
+81.63641	55.540700	107.73212
+84.68951	58.592294	110.78674
+81.29227	55.197881	107.38665
+82.84996	56.742835	108.95709
+84.19170	58.097240	110.28616
+46.47402	20.116520	72.83152
+73.84167	47.742309	99.94103
+77.09571	50.999715	103.19170
+76.29265	50.194195	102.39111
+87.35814	61.245050	113.47122
+63.87734	37.752803	90.00189
+87.36565	61.255538	113.47577
+72.39202	46.283984	98.50005
+96.24368	70.122151	122.36522
+99.37494	73.251392	125.49849
+86.61409	60.515272	112.71290
+97.74398	71.613739	123.87422
+89.61230	63.502089	115.72251
+84.45902	58.357382	110.56066
+82.20765	56.110869	108.30443
+81.75303	55.657366	107.84869
+77.11225	51.011029	103.21347
+82.89161	56.794524	108.98871
+88.16371	62.047979	114.27943
+85.88150	59.773295	111.98971
+78.30514	52.203647	104.40664
+90.59526	64.477348	116.71316
+81.66967	55.574005	107.76533
+73.81583	47.709142	99.92251
+75.00682	48.908801	101.10485
+75.32579	49.228747	101.42284
+74.01614	47.914780	100.11749
+79.86357	53.767734	105.95940
+86.25421	60.108656	112.39977
+84.30555	58.191544	110.41956
+85.79882	59.701647	111.89599
+82.06520	55.955002	108.17539
+89.95322	63.714876	116.19156
+99.86595	73.624760	126.10715
+87.92891	61.810079	114.04773
+57.42761	31.242457	83.61277
+62.55767	36.431732	88.68360
+113.79321	87.581967	140.00446
+70.63086	44.526683	96.73504
+79.75588	53.650938	105.86082
+78.88747	52.793008	104.98193
+81.28074	55.175898	107.38557
+84.36394	58.252229	110.47565
+70.43556	44.330875	96.54024
+77.22404	51.130233	103.31785
+76.14833	50.050266	102.24640
+75.70350	49.606571	101.80043
+82.23937	56.144037	108.33471
+76.29738	50.199063	102.39569
+80.12110	54.025955	106.21624
+73.52831	47.428323	99.62830
+87.33440	61.238737	113.43006
+81.53066	55.437556	107.62375
+78.53657	52.439741	104.63339
+81.61369	55.519233	107.70815
+79.05308	52.959055	105.14711
+81.50201	55.393833	107.61020
+72.17701	46.065073	98.28894
+100.90730	74.762772	127.05182
+90.54943	64.432677	116.66619
+78.87215	52.775360	104.96894
+68.13484	42.027582	94.24210
+70.69787	44.593267	96.80247
+84.96700	58.865780	111.06822
+83.94343	57.848263	110.03861
+93.96566	67.849744	120.08158
+79.34393	53.250062	105.43779
+77.41532	51.319622	103.51101
+81.52755	55.433914	107.62118
+81.26372	55.168892	107.35855
+85.05410	58.955587	111.15261
+80.71290	54.617870	106.80793
+88.03753	61.725918	114.34915
+74.80961	48.712168	100.90706
+81.53139	55.438306	107.62448
+82.01630	55.917714	108.11488
+80.87937	54.785987	106.97275
+70.68476	44.563323	96.80619
+74.43487	48.321942	100.54779
+92.06234	65.954342	118.17034
+78.06550	51.968954	104.16204
+85.87761	59.768695	111.98652
+77.69085	51.596206	103.78549
+73.79903	47.699940	99.89813
+84.31969	58.227672	110.41171
+77.46691	51.369308	103.56451
+85.41633	59.310808	111.52184
+73.03492	46.931940	99.13789
+87.24278	61.141532	113.34402
+85.72646	59.621246	111.83167
+84.65276	58.542359	110.76315
+86.88535	60.788915	112.98179
+65.96646	39.844774	92.08814
+89.87477	63.773709	115.97582
+81.39459	55.301882	107.48730
+84.94173	58.838918	111.04454
+73.94755	47.846031	100.04907
+88.85456	62.742439	114.96669
+83.00358	56.900243	109.10692
+56.01841	29.825720	82.21111
+90.91700	64.796027	117.03798
+36.91708	10.581502	63.25266
+69.91765	43.812006	96.02330
+74.93969	48.842945	101.03643
+82.51941	56.419343	108.61948
+85.00348	58.898254	111.10870
+80.57089	54.470618	106.67116
+##       fit              lwr              upr        
+##  Min.   : 29.03   Min.   : 2.578   Min.   : 55.49  
+##  1st Qu.: 76.21   1st Qu.:50.111   1st Qu.:102.32  
+##  Median : 81.53   Median :55.438   Median :107.62  
+##  Mean   : 80.51   Mean   :54.392   Mean   :106.62  
+##  3rd Qu.: 85.96   3rd Qu.:59.853   3rd Qu.:112.07  
+##  Max.   :113.79   Max.   :87.582   Max.   :140.00
+Appendex
+moneyball_training_data <- read_csv("https://raw.githubusercontent.com/nschettini/CUNY-MSDS-DATA-621/master/moneyball-training-data.csv")
+
+
+mbd1 <- describe(moneyball_training_data, na.rm = F)
+
+mbd1$na_count <- sapply(moneyball_training_data, function(y) sum(length(which(is.na(y)))))
+mbd1 <- mbd1[-1,]
+
+
+kable(mbd1, "html", escape = F) %>%
+  kable_styling("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(width = "100%", height = "700px")
+
+ggplot(stack(moneyball_training_data), aes(x = ind, y = values)) + 
+  geom_boxplot() +
+  theme(legend.position="none") +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) + 
+  theme(panel.background = element_rect(fill = '#d0ddf2'))
+
+
+ggplot(stack(moneyball_training_data), aes(x = ind, y = values)) + 
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0, 800)) +
+  theme(legend.position="none") +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) + 
+  theme(panel.background = element_rect(fill = '#d0ddf2'))
+
+
+mb_hist <- moneyball_training_data
+mb_hist <- mb_hist[,-1 ]
+
+mb_hist %>%
+  keep(is.numeric) %>%                     
+  gather() %>%                             
+  ggplot(aes(value)) +                     
+    facet_wrap(~ key, scales = "free") +  
+    geom_histogram(bins = 35)                 
+
+
+
+kable(cor(drop_na(mb_hist))[,1], "html", escape = F) %>%
+  kable_styling("striped", full_width = F) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(height = "500px")
+
+corrgram(drop_na(mb_hist), order=TRUE,
+         upper.panel=panel.cor, main="Moneyball")
+
+
+
+mbd2 <- moneyball_training_data
+mbd2 <- mbd2[,-1]
+mbd2 <- mbd2[,-10]
+mbd2 <- mbd2[,-12]
+
+
+
+
+init = mice(mbd2, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+predM[, c("TARGET_WINS")]=0
+
+imputed = mice(mbd2, method="rf", predictorMatrix=predM, m=5)
+
+imputed <- complete(imputed)
+
+imputedtable <- describe(imputed)
+
+kable(imputedtable, "html", escape = F) %>%
+  kable_styling("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(width = "100%", height = "700px")
+
+
+
+
+
+mbd2 <- moneyball_training_data
+mbd2 <- mbd2[,-c(1, 11, 13)]
+
+init = mice(mbd2, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+predM[, c("TARGET_WINS")]=0
+
+imputed = mice(mbd2, method="rf", predictorMatrix=predM, m=5)
+
+imputed <- complete(imputed)
+
+
+vif(imputed)
+v1 <- vifstep(imputed, th=10)
+
+
+imputedtable <- describe(imputed)
+
+kable(imputedtable, "html", escape = F) %>%
+  kable_styling("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(width = "100%", height = "700px")
+
+
+
+model1 <- lm(TARGET_WINS ~., imputed)
+
+
+model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H  + TEAM_BATTING_3B  + TEAM_BATTING_HR  + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_SO + TEAM_FIELDING_E + TEAM_FIELDING_DP, imputed)
+
+summary(model2)
+
+
+model4 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BASERUN_SB  + TEAM_FIELDING_E  + TEAM_BATTING_HR, imputed)
+
+summary(model4)
+
+
+
+
+compare_model1 <- c(m1mse, m1root, m1ar, m1fs )
+compare_model2 <- c(m2mse, m2root, m2ar, m2fs )
+compare_model3 <- c(m3mse, m3root, m3ar, m3fs )
+
+compare <- data.frame(compare_model1, compare_model2, compare_model3)
+colnames(compare) <- c("Model 1", "Model 2", "Model 3")
+
+kable(compare)
+
+
+
+
+mbeval <- mbeval[,-c(1, 10, 12)]
+
+
+init = mice(mbeval, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+
+imputed1 = mice(mbeval, method="rf", predictorMatrix=predM, m=5)
+
+imputed1 <- complete(imputed1)
+
+imputedtable1 <- describe(imputed1)
+
+kable(imputedtable1, "html", escape = F) %>%
+  kable_styling("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(width = "100%", height = "700px")
+
+predict1 <- predict(model4, newdata = imputed1, interval="prediction")
+kable(predict1, "html", escape = F) %>%
+  kable_styling("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(width = "100%", height = "700px")
+
+
+summary(predict1)
