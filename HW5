@@ -1,0 +1,478 @@
+---
+title: "CUNY MSDS Data 621 - HW 5"
+author: "NIcholas Schettini"
+date: "July 9, 2018"
+output:
+  prettydoc::html_pretty:
+    theme: hpstr
+    highlight: git
+    toc: true
+    toc_depth: 2
+---
+**Work in Progress**
+
+#Cover Page
+
+CUNY MSDS HW5 - 
+
+Nicholas Schettini
+
+CUNY School of Professional Studies
+
+#Abstract
+
+In this research assignment, we investigated data on a number of wine boxes sold.  The data consists of two response variables: TARGET.  The explanatory variables in this dataset include: AcidIndex, Alchol, Chlorides, CitricAcid, Density, FixedAcidity, FreeSulferDioxide, LabelAppeal, ResidualSugar, STARS, Sulphates, TotalSulfurDioxide, VolatileAcidity, pH.  The data consits of ~ 12795  observatrions and 14 variables.  The research included 4 overall groups: data exploration, data preparation, creating models, and selecting the best model.  The data was visualized using multiple methods, including histograms and boxplots.  The data was prepped by adding imputations using the mice package in R to correct NA values.  Different models were created based on different approaches (for example, Poisson and Zero Inflaction), and finally the best model was selected.  The research shows that certain variables from within the dataset set were better predictors than others.  
+
+
+
+#Overview
+In this homework assignment, you will explore, analyze and model a data set containing information on approximately 12,000 commercially available wines. The variables are mostly related to the chemical properties of the wine being sold. The response variable is the number of sample cases of wine that were purchased by wine distribution companies after sampling a wine. These cases would be used to provide tasting samples to restaurants and wine stores around the United States. The more sample cases purchased, the more likely is a wine to be sold at a high end restaurant. A large wine manufacturer is studying the data in order to predict the
+number of wine cases ordered based upon the wine characteristics. If the wine manufacturer can predict the number of cases, then that manufacturer will be able to adjust their wine offering to maximize sales.
+
+
+Your objective is to build a count regression model to predict the number of cases of wine that will be sold given certain properties of the wine. HINT: Sometimes, the fact that a variable is missing is actually predictive of the target. You can only use the variables given to you (or variables that you derive from the variables provided). Below is a short description of the variables of interest in the data set:
+
+
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(psych)
+library(readr)
+library(kableExtra)
+library(cowplot)
+library(reshape2)
+library(corrgram)
+library(gridExtra)
+library(usdm)
+library(mice)
+library(pROC)
+library(reshape2)
+library(caTools)
+library(caret)
+library(ROCR)
+library(MASS)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+wine_train <- read_csv("https://raw.githubusercontent.com/nschettini/CUNY-MSDS-DATA-621/master/wine-training-data.csv")
+wine_eval <- read_csv("https://raw.githubusercontent.com/nschettini/CUNY-MSDS-DATA-621/master/wine-evaluation-data.csv")
+```
+
+#Data Exploration
+
+The summary below shows multiple missing variables across most of the variables in the wine dataset. The TARGET variable seems to show a discrete variable rather than continious - # of wine boxes sold.
+```{r echo=FALSE}
+train <- describe(wine_train)
+train$na_count <- sapply(wine_train, function(y) sum(length(which(is.na(y)))))
+
+kable(train, "html", escape = F) %>%
+  kable_styling("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(width = "100%", height = "700px")
+```
+
+
+
+##Visual Exploration
+
+###Boxplots
+
+The below boxplots show all of the variables listed in the dataset.  This visualization will assist in showing how the data is spread for each variable.
+
+The boxplots show
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot1 <- wine_train[,-c(1)]
+
+ggplot(melt(ggplot1), aes(x=factor(variable), y=value)) + 
+  geom_boxplot() + 
+  stat_summary(fun.y = mean, color = "blue", geom = "point") +  
+  stat_summary(fun.y = median, color = "red", geom = "point") +
+  coord_flip() +
+  theme_bw()
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot2 <- wine_train[,-c(1, 6, 8, 9)]
+
+ggplot(melt(ggplot2), aes(x=factor(variable), y=value)) + 
+  geom_boxplot() + 
+  stat_summary(fun.y = mean, color = "blue", geom = "point") +  
+  stat_summary(fun.y = median, color = "red", geom = "point") +
+  coord_flip() +
+  theme_bw()
+```
+
+
+
+
+The target variable, number of cases, is shown below.  The data shows a large number of zero values.
+```{r echo=FALSE}
+ggplot(wine_train, aes(wine_train$TARGET )) + geom_bar()
+```
+
+The distribution looks like a Poisson distribution, with a significant amount of zero values.
+
+
+```{r echo=FALSE}
+long <- melt(wine_train, id.vars= colnames(wine_train)[1:13])%>% 
+  mutate(target = as.factor(TARGET))
+
+ggplot(data = long, aes(x = value)) + 
+  geom_bar(aes(fill = target)) + 
+  facet_wrap( ~ variable, scales = "free")
+```
+
+AcidIndex looks more shaped like a poisson distribution, with a slight right skew.  LabelAppearl and STARS seems to be more categorical.
+
+
+```{r echo=FALSE}
+wine_hist <- wine_train[,-c(1, 2, 14:16)]
+
+wine_hist %>%
+  keep(is.numeric) %>%                     
+  gather() %>%                             
+  ggplot(aes(value)) +                     
+    facet_wrap(~ key, scales = "free") +  
+    geom_histogram(bins = 35) 
+```
+The other variables seem to be more normally distributed with high kurtosis.
+
+
+
+###Correlation
+
+The correlation plot below shows how variables in the dataset are related to each other.  Looking at the plot, we can see that certain variables are more related than others. 
+
+For this project, it makes sense to break down the correlation by target - since that's what we're trying to predict.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+kable(cor(drop_na(wine_train))[,14], "html", escape = F) %>%
+  kable_styling("striped", full_width = F) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(height = "500px")
+```
+
+
+Looking at the correlations, very few look correlated at all.  The ones that do (STARS, LabelAppeal) have a small positive correlation, while AcidIndex and TARGET have a small negative correlation.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+corrgram(drop_na(wine_train), order=TRUE,
+         upper.panel=panel.cor, main="Crime")
+```
+
+
+
+###Missing Values
+
+According to the graph, the data shows multiple variables with missing variables.  The STARS variable has the most NA values.  These missing values will be imputed later on during the data preperation using the MICE package.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(Amelia)
+missmap(wine_train, col=c("black", "grey"), main = "Missing values vs observed")
+```
+
+
+
+
+
+
+
+
+#Data Prep
+
+
+###Imputation of Missing (NA) values
+
+The data exploration revealed multiple variables that had numerious NA values.  There are multiple ways to handle NA data: deleting the observations, deleting the variables, imputation with the mean/median/mode, or imputation with a prediction.
+
+Imputation the mean/median/mode is an easy way to fill in the missing NA's, however it reduces the variance in the dataset and shrinks standard errors - which can invalidate hypothesis tests.
+
+In this case, data will be imputated via prediction using the MICE (Multivariate Imputation) library using a random forest prediction method. 
+
+Since the data has many missing values over multiple different variables.  The MICE algorithm takes some computing time.. 
+```{r message=FALSE, warning=FALSE, include=FALSE}
+mbd2 <- wine_train
+mbd2 <- mbd2[,-c(1)]
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+init = mice(mbd2, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+predM[, c("TARGET")]=0
+
+imputed = mice(mbd2, method="rf", predictorMatrix=predM, m=5)
+
+imputed <- complete(imputed)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+imputedtable <- describe(imputed)
+
+kable(imputedtable, "html", escape = F) %>%
+  kable_styling("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(width = "100%", height = "700px")
+```
+
+##Absoulte value of variables
+
+Some of the discussion among classmates has been about taking the abs value of the variables in the dataset - since the debate on the negative numbers for multiple variables.
+
+In this case I will take an ABS transformation and apply it to the top performing model.
+
+```{r include=FALSE}
+absdata <- abs(imputed)
+```
+
+It seems however, that taking the ABS of the values in the dataset introduces a right skew where the variable would have been approx. normal.
+```{r echo=FALSE}
+absdata1 <- absdata[,-c(1, 2, 14:16)]
+
+absdata1 %>%
+  keep(is.numeric) %>%                     
+  gather() %>%                             
+  ggplot(aes(value)) +                     
+    facet_wrap(~ key, scales = "free") +  
+    geom_histogram(bins = 35) 
+```
+
+If this data is transformed using the log transformation, it seems to become 'more' normal - but this might be introducting overfitting into the data?
+
+```{r echo=FALSE}
+absdata1 %>%
+  keep(is.numeric) %>%                     
+  gather() %>%                             
+  ggplot(aes(value)) +                     
+    facet_wrap(~ key, scales = "free") +  
+    geom_histogram(bins = 35) +
+  scale_x_log10()
+```
+
+
+
+
+
+#Build Models
+
+Throughout this section, various models will be created to try to determine which will allow for the best "fit" to predict weather crime appears in a major city as given by the dataset.  In this assignment, I will try various models such as: Linear models, Negative Binomial, and Poisson, as suggested by the homework instructions.
+
+
+
+##Model 1 - Poisson with imputed data
+
+As per the homework videos, the poisson distribution works well with count data.  
+```{r echo=FALSE}
+poissonmod1 <- glm(TARGET ~., data=imputed, family=poisson)
+summary(poissonmod1)
+```
+
+
+##Model 2  - Poisson without imputed data
+
+```{r echo=FALSE}
+wine_train1 <- wine_train[,-c(1)]
+
+poissonmod2 <- glm(TARGET ~., data=wine_train1, family=poisson)
+summary(poissonmod2)
+
+```
+
+##Model 3 - Negative Binomial
+
+```{r echo=FALSE}
+negbinomMod <- glm.nb(TARGET ~., data=imputed)
+summary(negbinomMod)
+```
+
+
+##Linear Model
+
+```{r echo=FALSE}
+model4 <- lm(TARGET ~., data = imputed)
+summary(model4)
+```
+
+##Zero inflation 
+
+```{r echo=FALSE}
+library(pscl)
+model5 <- zeroinfl(TARGET ~. | STARS, data = imputed, dist = 'negbin')
+summary(model5)
+```
+
+
+
+##Model- glmulti Package
+
+The glmulti package is an "automated model selection and model averaging" tool.  The package automatically generates all possible models "with the specified response and explanatory variables".  The tool is basically used to find the "best" model.  
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(rJava)
+library(glmulti)
+
+glmulti.lm.out <-
+    glmulti(imputed$TARGET ~., data = imputed,
+            level = 1,               # No interaction considered
+            method = "h",            # Exhaustive approach
+            crit = "aic",            # AIC as criteria
+            confsetsize = 5,         # Keep 5 best models
+            plotty = F, report = F,  # No plot or interim reports
+            fitfunction = "lm")      # lm function
+
+## Show 5 best models (Use @ instead of $ for an S4 object)
+glmulti.lm.out@formulas
+```
+
+
+
+
+```{r}
+glmmodel <- glm(imputed$TARGET ~ 1 + VolatileAcidity + CitricAcid + Chlorides + 
+    FreeSulfurDioxide + TotalSulfurDioxide + Density + pH + Sulphates + 
+    Alcohol + LabelAppeal + AcidIndex + STARS, data = imputed)
+
+summary(glmmodel)
+```
+
+
+```{r}
+glmmodelabs <- glm(absdata$TARGET ~ 1 + VolatileAcidity + CitricAcid + Chlorides + 
+    FreeSulfurDioxide + TotalSulfurDioxide + Density + pH + Sulphates + 
+    Alcohol + LabelAppeal + AcidIndex + STARS, data = absdata)
+
+summary(glmmodelabs)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+#Select Models
+
+
+####Predictions
+
+Similar to the train data, the evaulation data also needs some prep work.  Similar to what was done for the test data, the eval data has had columns removed, and NA values imputed using the MICE - Random Forest method to predict what the NA values could be.
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+init = mice(wine_eval, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+
+imputed1 = mice(wine_eval, method="rf", predictorMatrix=predM, m=5)
+
+imputed1 <- complete(imputed1)
+```
+
+```{r echo=FALSE}
+imputedtable1 <- describe(imputed1)
+
+kable(imputedtable1, "html", escape = F) %>%
+  kable_styling("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  scroll_box(width = "100%", height = "700px")
+```
+
+
+
+##Evaulating the model 
+
+The model will be evaulated by looking at the MSE.
+
+```{r include=FALSE}
+modelValidation <- function(mod, test){
+  preds = predict(mod, test)
+  diffMat = as.numeric(preds) - as.numeric(test$TARGET)
+  diffMat = diffMat^2
+  loss <- mean(diffMat)
+  return(loss)
+}
+```
+
+
+
+```{r include=FALSE}
+df1 <- modelValidation(model4, as.data.frame(imputed))
+df2 <- modelValidation(poissonmod2, as.data.frame(imputed))
+df3 <- modelValidation(poissonmod1, as.data.frame(imputed))
+df4 <- modelValidation(negbinomMod, as.data.frame(imputed))
+df5 <- modelValidation(model5, as.data.frame(imputed))
+df6 <- modelValidation(glmmodel, as.data.frame(imputed))
+df7 <- modelValidation(glmmodelabs, as.data.frame(absdata))
+
+```
+
+
+
+Comparison of Models RME.
+```{r echo=FALSE}
+compare_model1 <- c(df1)
+compare_model2 <- c(df2)
+compare_model3 <- c(df3)
+compare_model4 <- c(df4)
+compare_model5 <- c(df5)
+compare_model6 <- c(df6)
+compare_model7 <- c(df7)
+
+compare <- data.frame(compare_model1, compare_model2, compare_model3, compare_model4, compare_model5, compare_model6, compare_model7)
+colnames(compare) <- c("Linear Model", "Poisson Model 2", "Poisson Model 1", "Negative BinomMod", "Zero Inflation", "GLmulti", "ABS")
+
+kable(compare)
+```
+
+
+
+The linear model and GLmulti model have very close RME.  Both models predictions are shown below:
+
+**Model 4**
+```{r echo=FALSE}
+predict1 <- predict(model4, newdata=imputed1, type="response")
+summary(predict1)
+```
+
+**Model 5**
+```{r echo=FALSE}
+predict2 <- predict(glmmodel, newdata=imputed1, type="response")
+summary(predict2)
+```
+
+
+
+#References
+
+All subset regression with leaps, bestglm, glmulti, and meifly. (n.d.). Retrieved from https://rstudio-pubs-static.s3.amazonaws.com/2897_9220b21cfc0c43a396ff9abf122bb351.html
+
+All subset regression with leaps, bestglm, glmulti, and meifly. (n.d.). Retrieved from https://rstudio-pubs-static.s3.amazonaws.com/2897_9220b21cfc0c43a396ff9abf122bb351.html
+
+
+All subset regression with leaps, bestglm, glmulti, and meifly. (n.d.). Retrieved from https://rstudio-pubs-static.s3.amazonaws.com/2897_9220b21cfc0c43a396ff9abf122bb351.html
+
+
+Model selection and multimodel inference made easy. (n.d.). Retrieved from 
+https://cran.r-project.org/web/packages/glmulti/glmulti.pdf
+
+Best subset model selection with R.(n.d.). Retrieved from
+http://jadianes.me/best-subset-model-selection-with-R
+
+ZERO-INFLATED POISSON REGRESSION | R DATA ANALYSIS EXAMPLES. (n.d.). Retrieved from
+https://stats.idre.ucla.edu/r/dae/zip/
+
+
+
+
+
+
